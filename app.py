@@ -7,20 +7,28 @@ import base64
 import asyncio
 import edge_tts
 
+# Page Config
 st.set_page_config(page_title="Eightfold Agentic Interviewer", layout="wide", page_icon="🎙️")
+
+# --- JAVASCRIPT: TRY TO STOP AUDIO ON CLICKS ---
+# This attempts to stop audio. If it fails due to security, the "Stop Button" is the backup.
 st.markdown("""
 <script>
     function stopAllAudio() {
         var audios = document.querySelectorAll('audio');
         audios.forEach(function(audio) {
             audio.pause();
+            audio.currentTime = 0;
         });
     }
-    document.addEventListener('mousedown', stopAllAudio);
-    document.addEventListener('keydown', stopAllAudio);
+    // Try to listen to the main document
+    document.addEventListener('click', stopAllAudio, true);
+    document.addEventListener('keydown', stopAllAudio, true);
+    document.addEventListener('touchstart', stopAllAudio, true);
 </script>
 """, unsafe_allow_html=True)
 
+# --- Custom CSS ---
 st.markdown("""
     <style>
     .stChatMessage { border-radius: 10px; padding: 10px; }
@@ -30,6 +38,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+
+# --- Edge TTS ---
 async def generate_audio_stream(text):
     communicate = edge_tts.Communicate(text, "en-US-AriaNeural")
     audio_data = b""
@@ -45,36 +55,48 @@ def text_to_speech(text):
         asyncio.set_event_loop(loop)
         audio_bytes = loop.run_until_complete(generate_audio_stream(text))
         return io.BytesIO(audio_bytes)
-    except Exception:
+    except Exception as e:
         return None
 
 
+# --- SMART AUDIO RENDERER ---
 def render_audio(audio_buffer, msg_index, audio_mode, is_last_message):
     if audio_buffer:
         is_new = msg_index not in st.session_state.played_indices
         if is_new:
             st.session_state.played_indices.add(msg_index)
+
         should_autoplay = audio_mode and is_new and is_last_message
+
         data = audio_buffer.getvalue()
         b64 = base64.b64encode(data).decode()
+
+        # Unique ID
+        aid = f"audio-{msg_index}"
+
         if should_autoplay:
+            # We inject a specific script right next to the player to monitor ITSELF
             md = f"""
-                <audio id="audio-{msg_index}" autoplay style="display:none;">
+                <audio id="{aid}" autoplay style="display:none;">
                 <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
                 </audio>
                 """
             st.markdown(md, unsafe_allow_html=True)
 
+
+# --- Helpers ---
 def extract_text_from_pdf(uploaded_file):
     try:
         pdf_reader = PdfReader(uploaded_file)
         text = ""
         for page in pdf_reader.pages:
             content = page.extract_text()
-            if content: text += content
+            if content:
+                text += content
         return text if text else "Resume text could not be extracted."
     except Exception as e:
         return f"Error reading PDF: {e}"
+
 
 def transcribe_audio(audio_bytes):
     r = sr.Recognizer()
@@ -88,6 +110,7 @@ def transcribe_audio(audio_bytes):
         return "Error"
 
 
+# --- Session State ---
 if "agent" not in st.session_state:
     st.session_state.agent = InterviewAgent()
 if "chat_history" not in st.session_state:
@@ -99,24 +122,38 @@ if "feedback_generated" not in st.session_state:
 if "played_indices" not in st.session_state:
     st.session_state.played_indices = set()
 
+# --- SIDEBAR ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/4712/4712009.png", width=50)
     st.title("Configuration")
+
+    # Mode Toggle
     audio_mode = st.toggle("🔊 Enable Audio Response", value=True)
     if not audio_mode:
         st.caption("Chat Mode (Silent)")
     else:
         st.caption("Voice Mode (Auto-Speak)")
+
+    # THE RELIABLE STOP BUTTON
+    # This forces a page reload, which kills all audio immediately.
+    if st.button("🔇 STOP SPEAKING", type="secondary", use_container_width=True):
+        st.rerun()
+
     st.divider()
 
     uploaded_file = st.file_uploader("1. Upload Resume (PDF)", type="pdf")
     resume_text = extract_text_from_pdf(uploaded_file) if uploaded_file else ""
-    if uploaded_file: st.success("✅ Resume Loaded")
+    if uploaded_file:
+        st.success("✅ Resume Loaded")
+
     st.divider()
+
     role = st.text_input("2. Target Role", "Full Stack Developer")
     level = st.selectbox("3. Seniority", ["Junior", "Mid-Level", "Senior"])
     job_desc = st.text_area("4. Job Description", "Must know Python, React, and AWS.", height=100)
+
     st.divider()
+
     if not st.session_state.interview_active:
         if st.button("🚀 Start Interview", type="primary"):
             st.session_state.interview_active = True
@@ -126,6 +163,7 @@ with st.sidebar:
 
             with st.spinner("AI is analyzing your profile..."):
                 msg = st.session_state.agent.start_interview(role, level, job_desc, resume_text)
+
             audio = text_to_speech(msg)
             st.session_state.chat_history.append({"role": "ai", "content": msg, "audio": audio})
             st.rerun()
@@ -148,6 +186,7 @@ with st.sidebar:
         st.session_state.played_indices = set()
         st.rerun()
 
+# --- MAIN UI ---
 if not st.session_state.interview_active and not st.session_state.feedback_generated:
     st.title("👋 Welcome to AI Interview Partner")
     st.markdown("### *Master your interview skills with Agentic AI.*")

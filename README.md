@@ -1,6 +1,6 @@
 # 🎙️ Agentic AI Interview Partner
 
-### *A Context-Aware, Voice-Enabled Technical Interviewer*
+**A Context-Aware, Voice-Enabled Technical Interviewer that adapts to you.**
 
 > **Submission for:** Eightfold.ai AI Agent Assignment  
 > **Built by:** Shanigarapu Abhinav  
@@ -8,37 +8,36 @@
 ---
 
 ## 📖 Project Overview
-The **Agentic Interview Partner** is designed to solve the problem of static, generic mock interviews. Unlike standard chatbots, this agent utilizes a **State-Machine Architecture** to conduct a structured, multi-modal interview tailored specifically to the candidate's resume and target job description.
+Most mock interview bots are static—they ask generic questions without knowing who you are. I built the **Agentic Interview Partner** to solve this.
+
+Unlike standard chatbots, this agent uses a **State-Machine Architecture**. It reads your **actual PDF Resume**, compares it against a specific **Job Description**, and conducts a structured interview to find gaps in your knowledge.
 
 ### 🌟 Key Features
-* **📄 Context-Aware Intelligence:** Parses the candidate's actual **PDF Resume** and performs a real-time Gap Analysis against the Job Description.
-* **🗣️ Voice-First Interaction:** Features **Microsoft Edge Neural TTS** for human-like speech.
-* **🧠 Agentic Reasoning:** Includes a **Hint System** that scaffolds learning for confused candidates instead of just giving answers.
-* **📊 Actionable Feedback:** Generates a structured Competency Scorecard (Markdown) with specific grading on Communication and Technical depth.
+* **📄 Context-Aware Intelligence:** Performs real-time "Gap Analysis" between your Resume and the Job Description to ask relevant questions.
+* **🗣️ Neural Voice Interaction:** Uses **Microsoft Edge TTS** for human-like speech (no robotic voices).
+* **🧠 Agentic Reasoning:** Includes a **Hint System** that acts as a mentor, providing clues to unblock confused candidates.
+* **📊 Actionable Feedback:** Generates a structured Competency Scorecard (Markdown) rating your Communication and Technical depth.
 
 ---
 
 ## 🏗️ Architecture & Design Decisions
 
-To meet the requirement of "Agentic Behaviour," I avoided a simple Q&A loop.
+To meet the requirement of "Agentic Behaviour," I avoided a simple Q&A loop and focused on User Experience.
 
-### 1. Context Injection
-* **Decision:** Instead of generic questions, the agent ingests the candidate's **Real Resume (PDF)** and the **Job Description** at runtime.
-* **Reasoning:** This allows the agent to perform **Gap Analysis**—asking questions specifically about skills missing from the resume but required by the job.
+### 1. Context Injection (RAG-Lite)
+* **The Problem:** Generic questions (e.g., "What is Python?") are useless for senior roles.
+* **The Solution:** I implemented a dynamic system prompt that ingests the **PDF Resume text** at runtime. The LLM performs a retrieval task to validate specific skills mentioned in the resume against the job requirements.
 
-### 2. Voice Architecture with "Kill Switch"
-* **Decision:** Integrated **Microsoft Edge TTS (Neural Voice)** over standard gTTS for a more professional persona.
-* **Technical Challenge:** Streamlit audio players typically "loop" or overlap on page reloads.
-* **Solution:** I implemented a custom **JavaScript Event Listener** that listens for `mousedown` events to silence audio immediately when the user interacts. This simulates a natural "Barge-In" experience found in real phone calls.
+### 2. Voice Architecture & User Control
+* **Decision:** I prioritized a "Voice-First" experience but realized that **latency and interruption** are major challenges in web-based AI.
+* **The Fix:**
+    1.  **Quality:** Integrated `edge-tts` for natural, non-robotic audio.
+    2.  **Control:** I implemented a **"Stop Speaking" button** and custom JavaScript. This solves the "Barge-In" problem, allowing users who read faster than the AI speaks to silence the audio instantly and proceed at their own pace.
 
-### 3. User Persona Handling
-* **The Confused User:** Implemented a **Hint System** to unblock candidates without revealing answers.
-* **The Chatty User:** System Prompts include **Guardrails** to politely deflect off-topic conversation.
-* **The Efficient User:** The model temperature (`0.7`) is tuned to recognize concise answers and increase difficulty dynamically.
-
-### 4. State Management
-* **Decision:** Used `st.session_state` to enforce a strict flow (Landing Page -> Interview -> Feedback).
-* **Reasoning:** Prevents logical errors (e.g., asking for feedback before the interview starts) and ensures a clean UI.
+### 3. Handling User Personas
+* **The Confused User:** Instead of letting a candidate fail silently, I added a **Hint Button**. This triggers a parallel LLM call to provide a scaffolding clue.
+* **The Chatty User:** The System Prompt includes strict **Guardrails** to politely deflect off-topic conversation (e.g., asking for pizza) and steer back to the interview.
+* **The Efficient User:** The model temperature (`0.7`) is tuned to recognize concise, correct answers and immediately ramp up the difficulty.
 
 ---
 
@@ -78,15 +77,16 @@ To meet the requirement of "Agentic Behaviour," I avoided a simple Q&A loop.
 ## 🚀 How to Use
 1.  **Upload Resume:** Upload your PDF resume in the sidebar.
 2.  **Configure Role:** Enter the target Job Role and Description.
-3.  **Start:** Click "Start Interview".
+3.  **Start:** Click **Start Interview**.
 4.  **Interact:** Use the Microphone for voice answers or type text.
-5.  **Finish:** Click "Finish & Get Feedback" to download your Scorecard.
+    * *Use the "Stop Speaking" button to interrupt the AI if needed.*
+5.  **Finish:** Click **Finish & Get Feedback** to generate and download your Scorecard.
 
 ---
 
 ## 🤖 Tech Stack
 * **Frontend:** Streamlit
 * **Orchestration:** LangChain
-* **LLM:** Google Gemini 2.0 Flash-Lite
+* **LLM:** Google Gemini 2.0 Flash-Lite (Optimized for speed)
 * **Audio:** Edge-TTS (Neural Voice), SpeechRecognition
 * **PDF Processing:** PyPDF
